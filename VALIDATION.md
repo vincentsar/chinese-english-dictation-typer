@@ -4,6 +4,7 @@ This file records checks that have been performed and gives contributors a repea
 
 ## Completed checks
 
+- An installed `/Applications/VoiceKeyboard` was observed to be a bare Mach-O executable, while the build output is `VoiceKeyboard.app`. `codesign --display --verbose=4` reported `Identifier=VoiceKeyboard-arm64` and `Info.plist=not bound` for the standalone executable; the app bundle's `Info.plist` declares `org.voicekeyboard.VoiceKeyboard`. This reproduces the installation mismatch behind the terminal-only launch report. The standalone process was stopped, the complete app bundle was installed under `/Applications/VoiceKeyboard.app`, and its process launched. The prior bare executable was moved to Trash. A live hotkey check with this bundle remains outstanding.
 - `make whisper` and `make app` built a local app with Command Line Tools. `codesign --verify --deep --strict build/VoiceKeyboard.app` passed.
 - The multilingual `small-q5_1` model loaded locally and completed warmup inference. The model download matched its pinned SHA-256 hash.
 - A menu bar launch, Accessibility event tap, microphone capture, recording overlay, distinct start and stop sounds, and insertion into TextEdit worked in an interactive check.
@@ -39,6 +40,6 @@ The mixed transcript preserves English terms but can change spacing and punctuat
 6. Try Clipboard paste in an app that rejects Unicode typing. Check that the target text arrives and existing clipboard content is restored when possible.
 7. Start recording in one field, switch focus to another field or window in the same app, then stop. Confirm no text is inserted and the transcript remains available through **Copy transcription**.
 8. Replace a test model file with altered bytes, then reload it. Confirm the app reports an integrity error before loading the native parser. Restore the original model afterward.
-7. Change focus before transcription completes. Confirm that the app avoids typing into the wrong app and that **Copy transcription** recovers the result.
+9. Change focus before transcription completes. Confirm that the app avoids typing into the wrong app and that **Copy transcription** recovers the result.
 
 Release-to-text latency, accessibility across other apps, and clipboard behavior still need broader measurements.

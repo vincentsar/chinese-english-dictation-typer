@@ -34,7 +34,7 @@ SWIFT_FILES := \
 LIBS := -lwhisper -lggml -lggml-base -lggml-cpu -lggml-metal -lggml-blas -lc++
 FRAMEWORKS := -framework Accelerate -framework Metal -framework MetalKit -framework AVFoundation -framework CoreGraphics -framework AppKit -framework Foundation -framework ServiceManagement -framework CoreAudio
 
-.PHONY: all clean whisper model app run dmg
+.PHONY: all clean whisper model app install run dmg
 
 all: whisper app
 
@@ -93,6 +93,10 @@ app: $(BUILD_DIR)/VoiceKeyboard
 
 run: app
 	open "$(APP_BUNDLE)"
+
+install: app
+	ditto "$(APP_BUNDLE)" "/Applications/VoiceKeyboard.app"
+	@echo "Installed /Applications/VoiceKeyboard.app; open it and grant permissions to this app bundle."
 
 dmg: app
 	./scripts/create-dmg.sh

@@ -8,6 +8,7 @@ final class HotkeyMonitor {
     private var retainedSelfPtr: UnsafeMutableRawPointer?
     private let onKeyDown: () -> Void
     private let onKeyUp: () -> Void
+    private let onTapStateChange: (Bool) -> Void
     private let lock = os_unfair_lock_t.allocate(capacity: 1)
 
     private var monitoredKeyCode: CGKeyCode {
@@ -19,11 +20,27 @@ final class HotkeyMonitor {
     }
 
     private var isKeyHeld = false
+    private var lastReportedTapState = false
 
-    init(onKeyDown: @escaping () -> Void, onKeyUp: @escaping () -> Void) {
+    /// Whether macOS currently reports the global event tap as enabled.
+    var isActive: Bool {
+        guard let eventTap else { return false }
+        return CGEvent.tapIsEnabled(tap: eventTap)
+    }
+
+    init(onKeyDown: @escaping () -> Void, onKeyUp: @escaping () -> Void,
+         onTapStateChange: @escaping (Bool) -> Void) {
         self.onKeyDown = onKeyDown
         self.onKeyUp = onKeyUp
+        self.onTapStateChange = onTapStateChange
         lock.initialize(to: os_unfair_lock())
+    }
+
+    private func reportTapStateIfChanged() {
+        let active = isActive
+        guard active != lastReportedTapState else { return }
+        lastReportedTapState = active
+        onTapStateChange(active)
     }
 
     deinit {
@@ -57,6 +74,7 @@ final class HotkeyMonitor {
         guard let eventTap else {
             fputs("[HotkeyMonitor] FAILED to create event tap! Grant Accessibility permission in System Settings.\n", stderr)
             Unmanaged<HotkeyMonitor>.fromOpaque(selfPtr).release()
+            reportTapStateIfChanged()
             return
         }
 
@@ -66,6 +84,7 @@ final class HotkeyMonitor {
         runLoopSource = CFMachPortCreateRunLoopSource(kCFAllocatorDefault, eventTap, 0)
         CFRunLoopAddSource(CFRunLoopGetMain(), runLoopSource, .commonModes)
         CGEvent.tapEnable(tap: eventTap, enable: true)
+        reportTapStateIfChanged()
 
         // Watchdog: macOS silently disables taps when Accessibility permission is stale.
         // Schedule explicitly on main run loop to guarantee it fires.
@@ -79,8 +98,10 @@ final class HotkeyMonitor {
         let timer = Timer(timeInterval: 2.0, repeats: true) { [weak self] _ in
             guard let self, let tap = self.eventTap else { return }
             if !CGEvent.tapIsEnabled(tap: tap) {
+                self.reportTapStateIfChanged()
                 fputs("[HotkeyMonitor] Event tap was disabled by macOS! Re-enabling...\n", stderr)
                 CGEvent.tapEnable(tap: tap, enable: true)
+                self.reportTapStateIfChanged()
                 // The tap was disabled — any in-flight key-down lost its key-up event.
                 // Reset isKeyHeld so the next press is accepted, AND synthesize the missed
                 // key-up so DictationEngine can recover (otherwise it stays stuck in
@@ -118,6 +139,7 @@ final class HotkeyMonitor {
             Unmanaged<HotkeyMonitor>.fromOpaque(ptr).release()
             retainedSelfPtr = nil
         }
+        reportTapStateIfChanged()
         if wasHeld {
             let callback = onKeyUp
             DispatchQueue.main.async(execute: callback)

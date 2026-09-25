@@ -109,7 +109,7 @@ struct OnboardingView: View {
             VStack(spacing: 8) {
                 Text("Welcome to Voice Keyboard")
                     .font(.system(size: 22, weight: .bold))
-                Text("Local, private voice-to-text powered by Whisper AI.\nHold a key to speak, release to type — nothing leaves your Mac.")
+                Text("Local voice-to-text powered by Whisper AI.\nTap a key to start speaking, then tap again to type. Audio stays on your Mac.")
                     .font(.system(size: 13))
                     .multilineTextAlignment(.center)
                     .foregroundStyle(.secondary)

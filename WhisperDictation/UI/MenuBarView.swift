@@ -6,6 +6,7 @@ struct MenuBarView: View {
     @ObservedObject private var settings = AppSettings.shared
     @ObservedObject private var modelManager = ModelManager.shared
     @Environment(\.openWindow) private var openWindow
+    private let permissionTimer = Timer.publish(every: 1.5, on: .main, in: .common).autoconnect()
 
     var body: some View {
         VStack(spacing: 0) {
@@ -14,6 +15,10 @@ struct MenuBarView: View {
                 .padding(.horizontal, 16)
                 .padding(.top, 14)
                 .padding(.bottom, 10)
+
+            readinessSection
+                .padding(.horizontal, 16)
+                .padding(.bottom, 12)
 
             // Alerts (permissions / errors)
             if !permissions.allPermissionsGranted || engine.modelLoadError != nil || engine.transcriptionError != nil || modelManager.downloadError != nil {
@@ -28,6 +33,13 @@ struct MenuBarView: View {
                     .padding(.horizontal, 16)
                     .padding(.bottom, 10)
             }
+
+            Divider()
+                .padding(.horizontal, 12)
+
+            controlsSection
+                .padding(.horizontal, 16)
+                .padding(.vertical, 12)
 
             Divider()
                 .padding(.horizontal, 12)
@@ -53,6 +65,10 @@ struct MenuBarView: View {
                 .padding(.bottom, 6)
         }
         .frame(width: 320)
+        .onAppear { permissions.checkPermissions() }
+        .onReceive(permissionTimer) { _ in
+            if !permissions.allPermissionsGranted { permissions.checkPermissions() }
+        }
     }
 
     // MARK: - Header
@@ -108,6 +124,53 @@ struct MenuBarView: View {
     }
 
     // MARK: - Alerts
+
+    private var readinessSection: some View {
+        VStack(alignment: .leading, spacing: 7) {
+            Text("Setup")
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(.secondary)
+            ReadinessRow(title: "Model", detail: engine.isModelLoaded ? "Loaded" : engine.modelLoadError == nil ? "Loading…" : "Needs attention", ready: engine.isModelLoaded)
+            ReadinessRow(title: "Microphone", detail: permissions.microphoneGranted ? "Allowed" : "Allow access", ready: permissions.microphoneGranted)
+            ReadinessRow(title: "Accessibility", detail: permissions.accessibilityGranted ? "Allowed" : "Allow access", ready: permissions.accessibilityGranted)
+            HStack {
+                Image(systemName: engine.isEventTapActive ? "checkmark.circle.fill" : "exclamationmark.circle.fill")
+                    .foregroundStyle(engine.isEventTapActive ? .green : .orange)
+                    .frame(width: 15)
+                Text("Dictation key")
+                Spacer()
+                Text(engine.isEventTapActive ? "Active" : "Inactive")
+                    .foregroundStyle(.secondary)
+                Button("\(hotkeyLabel) · Change") { showSettings() }
+                    .buttonStyle(.link)
+            }
+            .font(.system(size: 11))
+        }
+    }
+
+    private var controlsSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Dictation")
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(.secondary)
+            Picker("Language", selection: $settings.languageMode) {
+                Text("English + Chinese").tag(AppSettings.LanguageMode.englishChinese)
+                Text("English").tag(AppSettings.LanguageMode.english)
+                Text("Chinese").tag(AppSettings.LanguageMode.chinese)
+            }
+            Picker("Key action", selection: $settings.hotkeyMode) {
+                Text("Tap once, tap again").tag(AppSettings.HotkeyMode.toggle)
+                Text("Hold to talk").tag(AppSettings.HotkeyMode.pushToTalk)
+            }
+            Toggle("Speech preview", isOn: $settings.speechPreviewEnabled)
+        }
+        .font(.system(size: 12))
+    }
+
+    private func showSettings() {
+        openWindow(id: "settings")
+        NSApp.activate(ignoringOtherApps: true)
+    }
 
     private var alertsSection: some View {
         VStack(spacing: 6) {
@@ -188,7 +251,9 @@ struct MenuBarView: View {
     private var statusText: String {
         switch engine.state {
         case .idle:
-            if !engine.isModelLoaded { "Loading model..." }
+            if engine.modelLoadError != nil { "Model needs attention" }
+            else if !engine.isModelLoaded { "Loading model…" }
+            else if !permissions.microphoneGranted || !permissions.accessibilityGranted || !engine.isEventTapActive { "Finish setup to dictate" }
             else if settings.hotkeyMode == .toggle { "Ready — tap \(hotkeyLabel) to dictate" }
             else { "Ready — hold \(hotkeyLabel) to dictate" }
         case .recording:
@@ -202,7 +267,7 @@ struct MenuBarView: View {
 
     private var statusDotColor: Color {
         switch engine.state {
-        case .idle: engine.isModelLoaded ? .green : .orange
+        case .idle: engine.isModelLoaded && permissions.allPermissionsGranted && engine.isEventTapActive ? .green : .orange
         case .recording: .red
         case .processing: .orange
         case .typing: .blue
@@ -211,7 +276,9 @@ struct MenuBarView: View {
 
     private var statusGradient: LinearGradient {
         let colors: [Color] = switch engine.state {
-        case .idle: [.green.opacity(0.8), .green.opacity(0.5)]
+        case .idle: engine.isModelLoaded && permissions.allPermissionsGranted && engine.isEventTapActive
+            ? [.green.opacity(0.8), .green.opacity(0.5)]
+            : [.orange.opacity(0.8), .orange.opacity(0.5)]
         case .recording: [.red.opacity(0.9), .red.opacity(0.6)]
         case .processing: [.orange.opacity(0.8), .orange.opacity(0.5)]
         case .typing: [.blue.opacity(0.8), .blue.opacity(0.5)]
@@ -229,6 +296,25 @@ struct MenuBarView: View {
 
     private var hotkeyLabel: String {
         KeyCodeNames.shortLabel(for: settings.hotkeyKeyCode)
+    }
+}
+
+private struct ReadinessRow: View {
+    let title: String
+    let detail: String
+    let ready: Bool
+
+    var body: some View {
+        HStack(spacing: 6) {
+            Image(systemName: ready ? "checkmark.circle.fill" : "exclamationmark.circle.fill")
+                .foregroundStyle(ready ? .green : .orange)
+                .frame(width: 15)
+            Text(title)
+            Spacer()
+            Text(detail)
+                .foregroundStyle(.secondary)
+        }
+        .font(.system(size: 11))
     }
 }
 

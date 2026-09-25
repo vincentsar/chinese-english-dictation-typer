@@ -22,6 +22,7 @@ final class DictationEngine {
     private(set) var lastTranscription: String = ""
     private(set) var isModelLoaded: Bool = false
     private(set) var modelLoadError: String?
+    private(set) var isEventTapActive: Bool = false
 
     /// Last transcription/recording failure surfaced to the user (inference failure,
     /// audio input configuration change). Cleared when a new recording starts and on
@@ -178,7 +179,8 @@ final class DictationEngine {
     private func setupHotkeyMonitor() {
         hotkeyMonitor = HotkeyMonitor(
             onKeyDown: { [weak self] in self?.handleKeyDown() },
-            onKeyUp: { [weak self] in self?.handleKeyUp() }
+            onKeyUp: { [weak self] in self?.handleKeyUp() },
+            onTapStateChange: { [weak self] active in self?.isEventTapActive = active }
         )
     }
 

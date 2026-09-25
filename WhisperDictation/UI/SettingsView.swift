@@ -66,9 +66,9 @@ struct SettingsView: View {
 
             HStack(spacing: 6) {
                 Circle()
-                    .fill(engine.isModelLoaded ? .green : .orange)
+                    .fill(engine.isModelLoaded && permissions.allPermissionsGranted && engine.isEventTapActive ? .green : .orange)
                     .frame(width: 7, height: 7)
-                Text(engine.isModelLoaded ? "Ready" : "Loading...")
+                Text(engine.modelLoadError != nil ? "Model error" : !engine.isModelLoaded ? "Loading…" : !permissions.allPermissionsGranted || !engine.isEventTapActive ? "Setup needed" : "Ready")
                     .font(.system(size: 11))
                     .foregroundStyle(.secondary)
                 Spacer()

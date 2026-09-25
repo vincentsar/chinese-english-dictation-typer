@@ -61,10 +61,13 @@ private struct MenuBarLabel: View {
         if OnboardingView.shouldShowOnboarding(hasCompleted: settings.hasCompletedOnboarding, hasAnyModel: hasAnyModel) {
             openWindow(id: "onboarding")
             NSApp.activate(ignoringOtherApps: true)
-        } else {
-            // Existing/upgrading user: a model is already installed, so skip the flow
-            // and mark complete so this check never runs again.
+        } else if !settings.hasCompletedOnboarding {
+            // A model can already exist on disk for a new app identity while this
+            // bundle still has no permissions or saved dictation key. Show Settings
+            // once so the next step is discoverable instead of only showing an icon.
             settings.hasCompletedOnboarding = true
+            openWindow(id: "settings")
+            NSApp.activate(ignoringOtherApps: true)
         }
     }
 }

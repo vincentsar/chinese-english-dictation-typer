@@ -64,7 +64,9 @@ private struct RecordingBadge: View {
                     Text(isRecording ? "Recording" : state == .processing ? "Transcribing…" : "Inserting text…")
                         .font(.system(size: 13, weight: .semibold))
                         .foregroundStyle(.white)
-                    Text(isRecording ? "Release key to finish" : "Please keep the target app focused")
+                    Text(isRecording
+                         ? (AppSettings.shared.hotkeyMode == .toggle ? "Tap the key again to finish" : "Release key to finish")
+                         : "Please keep the target app focused")
                         .font(.system(size: 10))
                         .foregroundStyle(.white.opacity(0.75))
                 }
